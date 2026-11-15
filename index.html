@@ -122,6 +122,7 @@ label.l{display:block;font-size:12.5px;font-weight:600;color:var(--mute);margin:
 .photo-pick{display:flex;align-items:center;justify-content:center;flex-direction:column;gap:6px;aspect-ratio:16/10;border-radius:var(--r);border:2px dashed var(--line);background:var(--card);color:var(--mute);cursor:pointer;overflow:hidden;position:relative}
 .photo-pick img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
 .photo-pick .big{font-size:40px}
+.picks{display:flex;gap:8px;margin-top:8px}.picks .btn{flex:1}
 .rate{display:flex;align-items:center;gap:12px}
 .rate .stars{font-size:38px;gap:4px;cursor:pointer;user-select:none}
 .rate .val{font-family:Fraunces,serif;font-size:28px;font-weight:700;color:var(--wine);min-width:46px}
@@ -216,6 +217,7 @@ body.noapp nav#tabs,body.noapp #chips{display:none!important}
 <div id="dlg"><div class="box"><p id="dlgt"></p><div class="r"><button class="btn line sm" id="dlgn">Cancelar</button><button class="btn sm" id="dlgy">Confirmar</button></div></div></div>
 <div id="toast"></div>
 <input type="file" id="file" accept="image/*" hidden>
+<input type="file" id="cam" accept="image/*" capture="environment" hidden>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="config.js"></script>
 <script src="app.js"></script>

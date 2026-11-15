@@ -304,7 +304,8 @@ function wineHTML(id){
 function formHTML(){
   const p=F.p;const my=[...myGroupIds()].map(id=>groupMap()[id]);const gsel=p.groupId||(S.gf!=='all'?S.gf:my[0]?.id);
   return head(F.edit?'Editar vinho':'Novo vinho')+`
-  <div class="photo-pick" id="pp" data-act="pick">${F.preview?`<img src="${esc(F.preview)}" alt="">`:'<div class="big">📸</div><b>Tirar foto à garrafa</b><span class="small">ou escolher da galeria</span>'}</div>
+  <div class="photo-pick" id="pp" data-act="cam">${F.preview?`<img src="${esc(F.preview)}" alt="">`:'<div class="big">📸</div><b>Foto da garrafa</b><span class="small">tira uma foto ou escolhe da galeria</span>'}</div>
+  <div class="picks"><button type="button" class="btn ghost" data-act="cam">📷 Tirar foto</button><button type="button" class="btn ghost" data-act="pick">🖼️ Galeria</button></div>
   <label class="l">Grupo</label><select class="inp" id="f-group">${my.map(g=>`<option value="${esc(g.id)}"${g.id===gsel?' selected':''}>${esc(g.emoji)} ${esc(g.name)}</option>`).join('')}</select>
   <label class="l">Nome do vinho *</label><input class="inp" id="f-name" value="${esc(p.name)}" placeholder="Ex.: Esporão Reserva" maxlength="120">
   <div class="grid2"><div><label class="l">Produtor</label><input class="inp" id="f-producer" value="${esc(p.producer)}" maxlength="80"></div><div><label class="l">Colheita</label><input class="inp" id="f-vintage" inputmode="numeric" value="${esc(p.vintage||'')}" placeholder="2021" maxlength="4"></div></div>
@@ -434,6 +435,7 @@ document.addEventListener('click',e=>{
   if(a==='logout')return act(async()=>{if(!await ask(S.email?'Terminar sessão neste telemóvel?':'Sem email ligado, perdes o acesso aos teus vinhos se saíres. Continuar?','Sair'))return;await sb.auth.signOut();location.href=appUrl()});
   if(a==='new'){if(!myGroupIds().size){toast('Primeiro cria ou entra num grupo.');S.view='grupos';location.hash='grupos';return render()}return openForm()}
   if(a==='pick'){$('#file').value='';return $('#file').click()}
+  if(a==='cam'){$('#cam').value='';return $('#cam').click()}
   if(a==='buy'){F.buy=!F.buy;t.classList.toggle('on',F.buy);return}
   if(a==='save')return saveWine();
   if(a==='newgroup')return openSheet({type:'newgroup'});
@@ -442,7 +444,7 @@ document.addEventListener('click',e=>{
     return act(async()=>{const gid=chk(await sb.rpc('create_group',{p_name:n,p_emoji:emo}));S.gf=gid;saveGf();closeSheet();await loadAll();toast('Grupo criado! Agora convida os amigos 👥');openSheet({type:'group',id:gid})})}
 });
 document.addEventListener('input',e=>{if(e.target.dataset&&e.target.dataset.in==='q'){S.q=e.target.value;render()}});
-document.addEventListener('change',e=>{if(e.target.dataset&&e.target.dataset.ch==='sort'){S.sort=e.target.value;render()}if(e.target.id==='file')pickPhoto(e.target.files[0])});
+document.addEventListener('change',e=>{if(e.target.dataset&&e.target.dataset.ch==='sort'){S.sort=e.target.value;render()}if(e.target.id==='file'||e.target.id==='cam')pickPhoto(e.target.files[0])});
 document.addEventListener('keydown',e=>{
   if(e.key==='Escape'&&S.sheet)return closeSheet();if(e.key!=='Enter')return;
   const m={cmt:'[data-cmt]',wish:'[data-wadd]','g-name':'[data-act="creategroup"]',jcode:'[data-act="joincode"]','w-name':'[data-act="start"]','w-code':'#w-name','w-name2':'[data-act="setname"]','w-email':'[data-act="otp"]'}[e.target.id];
