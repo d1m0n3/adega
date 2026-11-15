@@ -54,7 +54,7 @@ function aggregate(ws){const m={};for(const w of ws){const k=wkey(w);(m[k]=m[k]|
   return{name:best.name,vintage:best.vintage,type:best.type,region:best.region,avg:avg(l.map(x=>x.rating||0)),n:l.length,price:pr.length?Math.min(...pr):null,thumb:photoSrc(best),id:best.id}})}
 
 // ---------- boot ----------
-(async function boot(){
+async function boot(){
   const C=window.ADEGA_CONFIG||{};
   if(!window.supabase||!C.SUPABASE_URL||/XXXX/.test(C.SUPABASE_URL)||/COLA_AQUI/.test(C.SUPABASE_ANON_KEY||'')){
     document.body.classList.add('noapp');
@@ -65,7 +65,8 @@ function aggregate(ws){const m={};for(const w of ws){const k=wkey(w);(m[k]=m[k]|
   sb.auth.onAuthStateChange((ev,session)=>{if(ev==='SIGNED_IN'&&session&&session.user.id!==S.uid)start(session)});
   const {data:{session}}=await sb.auth.getSession();
   if(session)start(session);else showWelcome();
-})();
+}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);else setTimeout(boot,0);
 
 async function showWelcome(mode){
   document.body.classList.add('noapp');
@@ -127,16 +128,17 @@ async function loadAll(){
     S.groups=chk(g).map(r=>({id:r.id,name:r.name,emoji:r.emoji,code:r.invite_code,createdBy:r.created_by}));
     S.members=chk(m).map(r=>({groupId:r.group_id,uid:r.user_id}));
     S.wines=chk(w).map(r=>({id:r.id,groupId:r.group_id,uid:r.user_id,name:r.name,producer:r.producer||'',vintage:r.vintage,type:r.type,region:r.region||'',country:r.country||'',grapes:r.grapes||'',
-      price:r.price==null?null:Number(r.price),where:r.where_bought||'',place:r.place||'',rating:Number(r.rating),tags:r.tags||[],comment:r.comment||'',pairing:r.pairing||'',buyAgain:r.buy_again,photo:r.photo_path,createdAt:Date.parse(r.created_at)}));
+      price:r.price==null?null:Number(r.price),where:r.where_bought||'',place:r.place||'',rating:Number(r.rating),tags:r.tags||[],comment:r.comment||'',pairing:r.pairing||'',buyAgain:r.buy_again,photo:r.photo_path,restaurantId:r.restaurant_id||null,createdAt:Date.parse(r.created_at)}));
     S.comments=chk(c).map(r=>({id:r.id,wineId:r.wine_id,uid:r.user_id,text:r.text,createdAt:Date.parse(r.created_at)}));
     S.cheers=chk(ch).map(r=>({wineId:r.wine_id,uid:r.user_id}));
     S.wish=chk(wl).map(r=>({id:r.id,groupId:r.group_id,uid:r.user_id,name:r.name,done:r.done,createdAt:Date.parse(r.created_at)}));
-    const ids=[...new Set([S.uid,...S.members.map(x=>x.uid),...S.wines.map(x=>x.uid),...S.comments.map(x=>x.uid)])];
+    await loadRest();
+    const ids=[...new Set([S.uid,...S.members.map(x=>x.uid),...S.wines.map(x=>x.uid),...S.comments.map(x=>x.uid),...S.rests.map(x=>x.uid),...S.rcom.map(x=>x.uid)])];
     if(ids.length){const p=chk(await sb.from('profiles').select('id,name').in('id',ids));for(const r of p)S.names[r.id]=r.name}
     if(S.gf!=='all'&&!groupMap()[S.gf])S.gf='all';
     S.loaded=true;S.err=null;
   }catch(e){S.err=errMsg(e)}
-  render();if(S.sheet&&S.sheet.type!=='form'&&S.sheet.type!=='newgroup')renderSheet();
+  render();if(S.sheet&&!['form','rform','newgroup'].includes(S.sheet.type))renderSheet();
 }
 
 // ---------- render ----------
@@ -146,11 +148,13 @@ function render(){
   keepFocus(()=>{
     document.querySelectorAll('#tabs [data-tab]').forEach(b=>b.classList.toggle('on',b.dataset.tab===S.view));
     $('#mebox').innerHTML=S.uid?`${av(S.uid)}<span>${esc(first(S.uid))}</span>`:'';
-    renderChips();
+    renderChips();renderModeBar();
     let h=S.err?`<div class="banner">${esc(S.err)}</div>`:'';
-    h+=({feed:vFeed,ranking:vRank,grupos:vGroups,eu:vStats}[S.view]||vFeed)();
+    const R=S.mode==='restaurantes';
+    h+=({feed:R?vRestFeed:vFeed,ranking:R?vRestRank:vRank,grupos:vGroups,eu:R?vRestStats:vStats}[S.view]||vFeed)();
     $('#main').innerHTML=h;
   });
+  afterRender();
 }
 function renderChips(){
   const show=S.view!=='grupos';const c=$('#chips');c.style.display=show?'flex':'none';if(!show)return;
@@ -256,13 +260,16 @@ function vStats(){
       h+=`<div class="sec"><h2>Classificação do grupo</h2></div><div class="card" style="padding:4px 14px">${P.map((p,i)=>`<div class="mem">${av(p.id,1)}<div class="mid"><b>${i+1}. ${esc(nameOf(p.id))}</b><div class="small muted">${p.n} vinho${p.n!==1?'s':''} · média ${fr(p.avg)} ★ · ${p.ap!=null?eur(p.ap)+' /garrafa':'s/ preço'}</div><div>${(badge[p.id]||[]).map(b=>`<span class="bdg">${b}</span>`).join('')}</div></div></div>`).join('')}</div>`;
     }
   }
-  // account
-  h+=`<div class="sec"><h2>A minha conta</h2></div><div class="card" style="padding:14px">
+  h+=accountHTML();
+  return h;
+}
+
+function accountHTML(){
+  return `<div class="sec"><h2>A minha conta</h2></div><div class="card" style="padding:14px">
   <label class="l" style="margin-top:0">O meu nome</label><div class="cmbox" style="margin:0"><input class="inp" id="acc-name" value="${esc(S.myName)}" maxlength="40"><button class="btn sm" data-act="rename">Guardar</button></div>
   <label class="l">Usar noutro telemóvel</label>${S.email?`<div class="small">✓ Conta ligada a <b>${esc(S.email)}</b>. Noutro telemóvel, escolhe “Já usei noutro telemóvel”.</div>`:
   `<div class="small muted" style="margin-bottom:8px">Liga um email para não perderes os teus vinhos se mudares de telemóvel ou limpares o browser.</div><div class="cmbox" style="margin:0"><input class="inp" id="acc-email" type="email" placeholder="o.teu@email.com"><button class="btn sm" data-act="linkemail">Ligar</button></div>`}
   <div style="height:14px"></div><button class="btn line sm" data-act="logout">Terminar sessão</button></div>`;
-  return h;
 }
 
 // ---------- sheets ----------
@@ -271,10 +278,12 @@ function closeSheet(){S.sheet=null;F=null;$('#sheet').classList.add('hidden');do
 function renderSheet(fresh){
   const s=S.sheet;if(!s)return;const p=$('#panel');
   if(s.type==='form'){if(fresh)p.innerHTML=formHTML();return}
+  if(s.type==='rform'){if(fresh)p.innerHTML=rformHTML();return}
   if(s.type==='newgroup'){if(fresh)p.innerHTML=newGroupHTML();return}
   keepFocus(()=>{const vals={};p.querySelectorAll('input[id]').forEach(i=>vals[i.id]=i.value);const st=p.scrollTop;
-    p.innerHTML=s.type==='wine'?wineHTML(s.id):groupHTML(s.id);
+    p.innerHTML=s.type==='wine'?wineHTML(s.id):s.type==='rest'?restHTML(s.id):groupHTML(s.id);
     for(const k in vals){const el=document.getElementById(k);if(el)el.value=vals[k]}p.scrollTop=fresh?0:st});
+  afterSheet();
 }
 const head=t=>`<div class="grab"></div><div class="ph-hd"><h2 style="font-size:21px">${t}</h2><button class="x" data-act="close" aria-label="Fechar">✕</button></div>`;
 
@@ -290,6 +299,7 @@ function wineHTML(id){
   if(w.tags.length)h+=`<div class="tags">${w.tags.map(x=>`<span class="tag">${esc(x)}</span>`).join('')}</div>`;
   const kv=[['Tipo',t.l],['Colheita',w.vintage],['Produtor',w.producer],['Região',[w.region,w.country].filter(Boolean).join(', ')],['Castas',w.grapes],['Onde comprou',[w.where,w.place].filter(Boolean).join(' · ')],['Harmonização',w.pairing],['Voltava a comprar',w.buyAgain?'Sim ✓':'Não']].filter(x=>x[1]);
   h+=`<div class="kv">${kv.map(([k,v])=>`<div><span>${k}</span><b>${esc(v)}</b></div>`).join('')}</div>`;
+  {const rr=w.restaurantId&&S.rests.find(x=>x.id===w.restaurantId);if(rr)h+=`<div class="rk" data-ropen="${esc(rr.id)}" style="margin-top:10px"><div class="ni">🍽️</div><div class="mid"><div class="small muted">Bebido em</div><b>${esc(rr.name)}</b></div><div class="end">›</div></div>`}
   h+=`<div class="acts" style="border:0;margin-top:14px;flex-wrap:wrap"><button class="pill${mineC?' on':''}" data-cheer="${esc(w.id)}">🥂 ${ch.length?ch.length+' ':''}Saúde!</button><button class="pill" data-taste="${esc(w.id)}">🍷 Também provei</button><button class="pill" data-share="${esc(w.id)}">📤 Partilhar</button>`;
   if(w.uid===S.uid)h+=`<button class="pill" data-edit="${esc(w.id)}">✏️ Editar</button><button class="pill" data-del="${esc(w.id)}" style="color:#b3261e">🗑</button>`;
   h+='</div>';
@@ -315,6 +325,7 @@ function formHTML(){
   <label class="l">A tua nota *</label><div class="rate"><span id="f-stars">${rateStars(F.rating)}</span><span class="val" id="f-rv">${F.rating?fr(F.rating):'–'}</span></div><div class="small muted">Toca na metade esquerda de uma estrela para meia estrela.</div>
   <div class="grid2"><div><label class="l">Preço (€)</label><input class="inp" id="f-price" inputmode="decimal" value="${p.price!=null?esc(String(p.price).replace('.',',')):''}" placeholder="0,00"></div><div><label class="l">Onde</label><select class="inp" id="f-where"><option value="">—</option>${WHERE.map(x=>`<option${p.where===x?' selected':''}>${x}</option>`).join('')}</select></div></div>
   <label class="l">Local (loja / restaurante)</label><input class="inp" id="f-place" value="${esc(p.place)}" placeholder="Ex.: Garrafeira Nacional" maxlength="80">
+  ${S.rests.length?`<label class="l">Bebido num restaurante do grupo?</label><select class="inp" id="f-rest"><option value="">— Não —</option>${S.rests.filter(r=>myGroupIds().has(r.groupId)).sort((a,b)=>a.name.localeCompare(b.name)).map(r=>`<option value="${esc(r.id)}"${p.restaurantId===r.id?' selected':''}>${esc(r.name)}${r.city?' · '+esc(r.city):''}</option>`).join('')}</select>`:''}
   <label class="l">Aromas e perfil</label><div class="tsel">${TAGS.map(t=>`<button type="button" data-ftag="${esc(t)}" class="${F.tags.has(t)?'on':''}">${t}</button>`).join('')}</div>
   <label class="l">Comentário</label><textarea class="inp" id="f-comment" maxlength="1000" placeholder="O que achaste? Com quem bebeste?">${esc(p.comment)}</textarea>
   <label class="l">Harmonização</label><input class="inp" id="f-pairing" value="${esc(p.pairing)}" placeholder="Ex.: Bacalhau à Brás" maxlength="100">
@@ -345,7 +356,7 @@ async function saveWine(){
     let photo=F.photo;const old=F.edit?S.wines.find(w=>w.id===F.edit)?.photo:null;
     if(F.blob){const path=`${S.uid}/${crypto.randomUUID()}.jpg`;chk(await sb.storage.from('photos').upload(path,F.blob,{contentType:'image/jpeg',cacheControl:'31536000'}));photo=path}
     const row={group_id:groupId,name,producer:v('f-producer')||null,vintage:(vin>1800&&vin<2100)?vin:null,type:F.type,region:v('f-region')||null,country:v('f-country')||null,grapes:v('f-grapes')||null,
-      price:num(v('f-price')),where_bought:v('f-where')||null,place:v('f-place')||null,rating:F.rating,tags:[...F.tags],comment:v('f-comment')||null,pairing:v('f-pairing')||null,buy_again:F.buy,photo_path:photo||null,updated_at:new Date().toISOString()};
+      price:num(v('f-price')),where_bought:v('f-where')||null,place:v('f-place')||null,rating:F.rating,tags:[...F.tags],comment:v('f-comment')||null,pairing:v('f-pairing')||null,buy_again:F.buy,photo_path:photo||null,...(S.noRest?{}:{restaurant_id:v('f-rest')||null}),updated_at:new Date().toISOString()};
     if(F.edit)chk(await sb.from('wines').update(row).eq('id',F.edit));else chk(await sb.from('wines').insert(row));
     if(F.blob&&old&&old!==photo)sb.storage.from('photos').remove([old]);
     if(F.wishId)await sb.from('wishlist').update({done:true}).eq('id',F.wishId);
@@ -433,7 +444,7 @@ document.addEventListener('click',e=>{
   if(a==='rename'){const n=($('#acc-name').value||'').trim();if(!n)return;return act(async()=>{chk(await sb.from('profiles').upsert({id:S.uid,name:n.slice(0,40)}));S.myName=n;S.names[S.uid]=n;toast('Nome atualizado ✓');render()})}
   if(a==='linkemail'){const em=($('#acc-email').value||'').trim();if(!/.+@.+\..+/.test(em))return toast('Email inválido.');return act(async()=>{const r=await sb.auth.updateUser({email:em},{emailRedirectTo:appUrl()});if(r.error)throw r.error;toast('Confirma no email que te enviámos 📧')})}
   if(a==='logout')return act(async()=>{if(!await ask(S.email?'Terminar sessão neste telemóvel?':'Sem email ligado, perdes o acesso aos teus vinhos se saíres. Continuar?','Sair'))return;await sb.auth.signOut();location.href=appUrl()});
-  if(a==='new'){if(!myGroupIds().size){toast('Primeiro cria ou entra num grupo.');S.view='grupos';location.hash='grupos';return render()}return openForm()}
+  if(a==='new'){if(!myGroupIds().size){toast('Primeiro cria ou entra num grupo.');S.view='grupos';location.hash='grupos';return render()}return S.mode==='restaurantes'?(S.noRest?toast('Corre primeiro o restaurantes.sql no Supabase.'):openRForm()):openForm()}
   if(a==='pick'){$('#file').value='';return $('#file').click()}
   if(a==='cam'){$('#cam').value='';return $('#cam').click()}
   if(a==='buy'){F.buy=!F.buy;t.classList.toggle('on',F.buy);return}

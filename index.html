@@ -13,6 +13,7 @@
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
@@ -198,11 +199,26 @@ body.noapp nav#tabs,body.noapp #chips{display:none!important}
 .welcome h2{font-size:28px;color:var(--wine);margin:6px 0}
 .welcome label.l{text-align:left}
 .welcome a{color:var(--wine);font-weight:600}
+
+.modebar{display:flex;gap:4px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:3px;margin:2px 0 4px}
+.modebar button{flex:1;padding:7px 6px;border-radius:9px;font-size:13.5px;font-weight:600;color:var(--mute)}
+.modebar button.on{background:var(--wine);color:#fff}
+.rmap{height:62vh;border-radius:var(--r);overflow:hidden;box-shadow:var(--sh);margin-bottom:8px;z-index:1}
+.minimap{height:170px;border-radius:14px;overflow:hidden;margin-top:12px;z-index:1}
+.pin{background:none;border:0}.pin span{display:flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:50%;background:#fff;border:3px solid var(--wine);font-size:16px;box-shadow:0 2px 6px rgba(0,0,0,.35)}
+.popup a{color:var(--wine);font-weight:600}
+a.pill{text-decoration:none;color:inherit}
+.subs{display:flex;flex-direction:column;gap:6px;margin-top:10px;background:var(--card);border-radius:12px;padding:10px 13px}
+.subrow{display:flex;align-items:center;justify-content:space-between;font-size:14px}
+.stars.sub{font-size:24px;gap:3px;cursor:pointer}
+.leaflet-container{font:inherit}
+body.noapp #modebar{display:none!important}
 </style>
 </head>
 <body>
 <header id="top"><div class="wrap">
   <div class="brand"><h1>Adega <span>dos Amigos</span></h1><div class="me" id="mebox"></div></div>
+  <div class="modebar" id="modebar"></div>
   <div class="chips" id="chips"></div>
 </div></header>
 <main><div class="wrap" id="main"><div class="skel"></div><div class="skel"></div></div></main>
@@ -220,6 +236,8 @@ body.noapp nav#tabs,body.noapp #chips{display:none!important}
 <input type="file" id="cam" accept="image/*" capture="environment" hidden>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="config.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
 <script src="app.js"></script>
+<script src="rest.js"></script>
 </body>
 </html>
