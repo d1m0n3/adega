@@ -20,6 +20,17 @@ function rcheersOf(id){return S.rch.filter(c=>c.rid===id)}
 function rcommentsOf(id){return S.rcom.filter(c=>c.rid===id).sort((a,b)=>a.createdAt-b.createdAt)}
 function cuisColor(c){return`hsl(${hue(c||'x')} 42% 38%)`}
 function rPhoto(r){return r.photo?photoSrc(r):''}
+// mini-mapa (OpenStreetMap) para restaurantes sem foto
+function osmThumb(lat,lng,z,rx,ry,small){
+  const n=2**z,la=lat*Math.PI/180,xt=(lng+180)/360*n,yt=(1-Math.log(Math.tan(la)+1/Math.cos(la))/Math.PI)/2*n;
+  const tx=Math.floor(xt),ty=Math.floor(yt),fx=Math.round((xt-tx)*256),fy=Math.round((yt-ty)*256);let h='<div class="osm">';
+  for(let dy=-ry;dy<=ry;dy++)for(let dx=-rx;dx<=rx;dx++){const x=((tx+dx)%n+n)%n,y=ty+dy;if(y<0||y>=n)continue;
+    h+=`<img src="https://tile.openstreetmap.org/${z}/${x}/${y}.png" alt="" loading="lazy" style="left:calc(50% + ${dx*256-fx}px);top:calc(50% + ${dy*256-fy}px)">`}
+  return h+`<span class="osmpin${small?' sm':''}">🍽️</span>${small?'':'<span class="osmattr">© OpenStreetMap</span>'}</div>`}
+function rVisual(r,size){
+  if(r.photo)return`<img src="${esc(rPhoto(r))}" loading="lazy" alt="">`;
+  if(r.lat!=null&&r.lng!=null)return size==='sm'?osmThumb(r.lat,r.lng,16,1,1,true):osmThumb(r.lat,r.lng,16,2,1,false);
+  return size==='sm'?'<div class="ni">🍽️</div>':'<div class="noph">🍽️</div>'}
 
 // ---------- data ----------
 async function loadRest(){
@@ -61,7 +72,7 @@ function subLine(r){return SUBS.filter(([k])=>r[k]).map(([k,l])=>`${l} <b>${r[k]
 function rcard(r){
   const g=groupMap()[r.groupId];const ch=rcheersOf(r.id);const mine=ch.some(c=>c.uid===S.uid);const nc=rcommentsOf(r.id).length;
   return `<article class="card" data-ropen="${esc(r.id)}">
-  <div class="ph" style="--tc:${cuisColor(r.cuisine)}">${r.photo?`<img src="${esc(rPhoto(r))}" loading="lazy" alt="">`:'<div class="noph">🍽️</div>'}${r.cuisine?`<span class="badge">${esc(r.cuisine)}</span>`:''}${r.pp!=null?`<span class="vint">${eur(r.pp)} /pessoa</span>`:''}</div>
+  <div class="ph" style="--tc:${cuisColor(r.cuisine)}">${rVisual(r)}${r.cuisine?`<span class="badge">${esc(r.cuisine)}</span>`:''}${r.pp!=null?`<span class="vint">${eur(r.pp)} /pessoa</span>`:''}</div>
   <div class="body"><div class="who">${av(r.uid)}<b>${esc(nameOf(r.uid))}</b><span>· ${ago(r.createdAt)}</span>${S.gf==='all'&&g?`<span>· ${esc(g.emoji)} ${esc(g.name)}</span>`:''}</div>
   <h3>${esc(r.name)}</h3>${r.city?`<div class="sub">📍 ${esc(r.city)}</div>`:''}
   <div class="row">${stars(r.rating)}<span class="num">${fr(r.rating)}</span>${subLine(r)?`<span class="small muted">${subLine(r)}</span>`:''}</div>
@@ -88,7 +99,7 @@ function vRestRank(){
   if(!myGroupIds().size)return noGroup();
   const rs=rScope();let h=noRestBanner();
   h+=`<div class="seg">${[['top','⭐ Melhores'],['valor','💶 Qualidade/preço'],['cozinha','🍴 Por cozinha'],['cidade','📍 Por cidade']].map(([k,l])=>`<button class="${S.rrk===k?'on':''}" data-rrk="${k}">${l}</button>`).join('')}</div>`;
-  const row=(r,i,end)=>`<div class="rk" data-ropen="${esc(r.id)}"><div class="pos ${i<3?'g'+(i+1):''}">${i+1}</div>${r.photo?`<img src="${esc(rPhoto(r))}" alt="" loading="lazy">`:'<div class="ni">🍽️</div>'}<div class="mid"><b>${esc(r.name)}</b><div class="small muted">${esc([r.cuisine,r.city].filter(Boolean).join(' · '))}</div>${stars(r.rating)}</div><div class="end">${end(r)}</div></div>`;
+  const row=(r,i,end)=>`<div class="rk" data-ropen="${esc(r.id)}"><div class="pos ${i<3?'g'+(i+1):''}">${i+1}</div>${r.photo?`<img src="${esc(rPhoto(r))}" alt="" loading="lazy">`:`<div class="ni osmbox">${rVisual(r,'sm')}</div>`}<div class="mid"><b>${esc(r.name)}</b><div class="small muted">${esc([r.cuisine,r.city].filter(Boolean).join(' · '))}</div>${stars(r.rating)}</div><div class="end">${end(r)}</div></div>`;
   const e1=r=>`<b>${fr(r.rating)}</b><div class="small muted">${r.pp!=null?eur(r.pp):''}</div>`;
   if(!rs.length)return h+`<div class="empty">Ainda sem restaurantes para classificar.</div>`;
   if(S.rrk==='top')h+=[...rs].sort((a,b)=>b.rating-a.rating||b.createdAt-a.createdAt).slice(0,25).map((r,i)=>row(r,i,e1)).join('');
@@ -128,7 +139,7 @@ function restHTML(id){
   const wines=S.wines.filter(w=>w.restaurantId===r.id);
   const same=S.rests.filter(x=>x.id!==r.id&&norm(x.name)===norm(r.name)&&norm(x.city)===norm(r.city)&&scopeIds().has(x.groupId));
   let h=head(esc(r.name));
-  h+=`<div class="big-ph">${r.photo?`<img src="${esc(rPhoto(r))}" alt="">`:'<div class="noph">🍽️</div>'}</div>`;
+  if(r.photo||r.lat==null)h+=`<div class="big-ph">${rVisual(r)}</div>`;
   h+=`<div class="who">${av(r.uid)}<b>${esc(nameOf(r.uid))}</b><span>· ${ago(r.createdAt)}</span>${g?`<span>· ${esc(g.emoji)} ${esc(g.name)}</span>`:''}</div>`;
   h+=`<div class="row" style="margin-top:4px"><span class="bigst">${stars(r.rating)}</span><span class="num" style="font-size:22px;font-family:Fraunces,serif">${fr(r.rating)}</span><span class="price" style="font-size:18px">${r.pp!=null?eur(r.pp)+' /pessoa':''}</span></div>`;
   if(SUBS.some(([k])=>r[k]))h+=`<div class="kv" style="grid-template-columns:repeat(3,1fr)">${SUBS.map(([k,l])=>`<div><span>${l}</span><b>${r[k]?stars(r[k]):'—'}</b></div>`).join('')}</div>`;
