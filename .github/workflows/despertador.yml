@@ -1,0 +1,44 @@
+# Despertador do Supabase: impede que o projeto gratuito seja pausado
+# por inatividade (o Supabase pausa ao fim de 7 dias sem atividade).
+name: Despertador Supabase
+
+on:
+  schedule:
+    # dias 1, 7, 13, 19, 25 e 31 de cada mês, às 09:17 (nunca mais de 6 dias de intervalo)
+    - cron: "17 9 */6 * *"
+  workflow_dispatch: {}   # permite correr à mão em Actions → Despertador Supabase → Run workflow
+
+permissions:
+  contents: write
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Tocar na base de dados
+        env:
+          SUPABASE_URL: https://bkwqmykhrtkxfhthhahj.supabase.co
+          SUPABASE_KEY: sb_publishable_LNN9zJJFPLtAkzs6gY_yQQ_w17kkSMB
+        run: |
+          for i in 1 2 3; do
+            code=$(curl -s -o resp.txt -w "%{http_code}" -X POST "$SUPABASE_URL/rest/v1/rpc/needs_setup" \
+              -H "apikey: $SUPABASE_KEY" -H "Content-Type: application/json" -d '{}')
+            echo "Resposta: $code $(cat resp.txt)"
+            if [ "$code" = "200" ]; then exit 0; fi
+            sleep 20
+          done
+          echo "::error::O Supabase não respondeu — o projeto pode estar pausado. Abre o painel do Supabase e carrega em Restore."
+          exit 1
+
+      # O GitHub desliga tarefas agendadas em repositórios sem atividade há 60 dias.
+      # Este passo regista a data do último toque para manter o repositório ativo.
+      - uses: actions/checkout@v4
+      - name: Registar último toque
+        run: |
+          mkdir -p .github
+          date -u +"%Y-%m-%dT%H:%M:%SZ" > .github/ultimo-despertar.txt
+          git config user.name "despertador-bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .github/ultimo-despertar.txt
+          git commit -m "Despertador: $(date -u +%Y-%m-%d)" || exit 0
+          git push
