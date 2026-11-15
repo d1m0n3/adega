@@ -109,6 +109,18 @@ end $$;
 grant execute on function public.create_group(text, text) to authenticated;
 grant execute on function public.join_group(text) to authenticated;
 
+-- ---------- Entrada só por convite ----------
+create or replace function public.invite_info(p_code text) returns text
+language sql security definer set search_path = public stable as $$
+  select name from groups where invite_code = upper(trim(p_code));
+$$;
+create or replace function public.needs_setup() returns boolean
+language sql security definer set search_path = public stable as $$
+  select not exists (select 1 from groups);
+$$;
+grant execute on function public.invite_info(text) to anon, authenticated;
+grant execute on function public.needs_setup() to anon, authenticated;
+
 -- ---------- Segurança (Row Level Security) ----------
 alter table public.profiles    enable row level security;
 alter table public.groups      enable row level security;

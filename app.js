@@ -67,17 +67,27 @@ function aggregate(ws){const m={};for(const w of ws){const k=wkey(w);(m[k]=m[k]|
   if(session)start(session);else showWelcome();
 })();
 
-function showWelcome(mode){
+async function showWelcome(mode){
   document.body.classList.add('noapp');
-  const inv=S.joinCode?`<div class="banner">🎉 Foste convidado para um grupo! Diz-nos o teu nome para entrares.</div>`:'';
-  $('#main').innerHTML=mode==='email'?`
+  const m=$('#main');
+  if(mode==='email'){m.innerHTML=`
   <div class="welcome"><div class="big">📧</div><h2>Entrar com email</h2><p class="muted">Se já ligaste um email à tua conta noutro telemóvel, recebes um link para entrar.</p>
   <input class="inp" id="w-email" type="email" placeholder="o.teu@email.com" autocomplete="email"><div style="height:10px"></div>
-  <button class="btn block" data-act="otp">Enviar link</button><div style="height:10px"></div><button class="btn line block" data-act="welcome">Voltar</button></div>`:`
-  ${inv}<div class="welcome"><div class="big">🍷</div><h2>Adega dos Amigos</h2><p class="muted">Fotografa, avalia e partilha os vinhos que bebes com os teus amigos.</p>
-  <label class="l">Como te chamas?</label><input class="inp" id="w-name" placeholder="O teu nome" maxlength="40" autocomplete="given-name"><div style="height:12px"></div>
-  <button class="btn block" data-act="start">Entrar 🥂</button>
-  <p class="small muted" style="margin-top:18px">Não precisas de conta. <a href="#" data-act="emailmode">Já usei noutro telemóvel</a></p></div>`;
+  <button class="btn block" data-act="otp">Enviar link</button><div style="height:10px"></div><button class="btn line block" data-act="welcome">Voltar</button></div>`;return}
+  m.innerHTML='<div class="welcome"><div class="big">🍷</div><p class="muted"><span class="spin"></span></p></div>';
+  let invName=null,setup=false;
+  try{
+    if(S.joinCode)invName=chk(await sb.rpc('invite_info',{p_code:S.joinCode}));
+    if(!invName)setup=!!chk(await sb.rpc('needs_setup'));
+  }catch(e){}
+  if(S.joinCode&&!invName)S.joinCode=null;
+  const nameField=`<label class="l">Como te chamas?</label><input class="inp" id="w-name" placeholder="O teu nome" maxlength="40" autocomplete="given-name">`;
+  const foot=`<p class="small muted" style="margin-top:18px"><a href="#" data-act="emailmode">Já usei noutro telemóvel</a></p>`;
+  if(invName){m.innerHTML=`<div class="welcome"><div class="big">🎉</div><h2>Foste convidado!</h2><p class="muted">Para o grupo <b>${esc(invName)}</b> na Adega dos Amigos.</p>${nameField}<div style="height:12px"></div><button class="btn block" data-act="start">Entrar 🥂</button>${foot}</div>`;return}
+  if(setup){S.setup=true;m.innerHTML=`<div class="welcome"><div class="big">🍷</div><h2>Adega dos Amigos</h2><p class="muted">Ainda não há nenhum grupo. Entra e cria o primeiro — depois convidas os teus amigos.</p>${nameField}<div style="height:12px"></div><button class="btn block" data-act="start">Começar 🥂</button>${foot}</div>`;return}
+  m.innerHTML=`<div class="welcome"><div class="big">🔒</div><h2>Só por convite</h2><p class="muted">Pede a um amigo o link ou o código de convite do grupo.</p>
+  <label class="l">Código de convite</label><input class="inp" id="w-code" placeholder="Ex.: A1B2C3" maxlength="6" style="text-transform:uppercase;letter-spacing:.2em;text-align:center" autocomplete="off">
+  ${nameField}<div style="height:12px"></div><button class="btn block" data-act="start">Entrar 🥂</button>${foot}</div>`;
 }
 async function start(session){
   if(!session||S.started===session.user.id)return;
@@ -406,9 +416,15 @@ document.addEventListener('click',e=>{
   if(d.wtaste){const x=S.wish.find(w=>w.id===d.wtaste);if(x)openForm({name:x.name,groupId:x.groupId,wishId:x.id});return}
   const a=d.act;
   if(a==='close')return closeSheet();
-  if(a==='start'){const n=($('#w-name').value||'').trim();if(!n)return toast('Escreve o teu nome.');t.disabled=true;t.innerHTML='<span class="spin"></span>';
-    sessionStorage.setItem('adega.pendingName',n.slice(0,40));
-    return act(async()=>{const r=await sb.auth.signInAnonymously();if(r.error){t.disabled=false;t.textContent='Entrar 🥂';throw r.error}if(!S.uid)start(r.data.session)})}
+  if(a==='start'){const n=($('#w-name').value||'').trim();const codeEl=$('#w-code');
+    if(codeEl){const c=(codeEl.value||'').trim().toUpperCase();if(c.length<6)return toast('Escreve o código de convite (6 caracteres).');S.joinCode=c}
+    if(!n)return toast('Escreve o teu nome.');
+    t.disabled=true;t.innerHTML='<span class="spin"></span>';const reset=()=>{t.disabled=false;t.textContent='Entrar 🥂'};
+    return act(async()=>{
+      if(S.joinCode){const g=chk(await sb.rpc('invite_info',{p_code:S.joinCode}));if(!g){reset();S.joinCode=null;return toast('Código de convite inválido.')}}
+      else if(!S.setup||!chk(await sb.rpc('needs_setup'))){reset();return showWelcome()}
+      sessionStorage.setItem('adega.pendingName',n.slice(0,40));
+      const r=await sb.auth.signInAnonymously();if(r.error){reset();throw r.error}if(!S.uid)start(r.data.session)})}
   if(a==='setname'){const n=($('#w-name2').value||'').trim();if(!n)return toast('Escreve o teu nome.');return act(async()=>{chk(await sb.from('profiles').upsert({id:S.uid,name:n.slice(0,40)}));S.myName=n;start((await sb.auth.getSession()).data.session)})}
   if(a==='emailmode'){e.preventDefault();return showWelcome('email')}
   if(a==='welcome')return showWelcome();
@@ -429,6 +445,6 @@ document.addEventListener('input',e=>{if(e.target.dataset&&e.target.dataset.in==
 document.addEventListener('change',e=>{if(e.target.dataset&&e.target.dataset.ch==='sort'){S.sort=e.target.value;render()}if(e.target.id==='file')pickPhoto(e.target.files[0])});
 document.addEventListener('keydown',e=>{
   if(e.key==='Escape'&&S.sheet)return closeSheet();if(e.key!=='Enter')return;
-  const m={cmt:'[data-cmt]',wish:'[data-wadd]','g-name':'[data-act="creategroup"]',jcode:'[data-act="joincode"]','w-name':'[data-act="start"]','w-name2':'[data-act="setname"]','w-email':'[data-act="otp"]'}[e.target.id];
-  if(m)document.querySelector(m)?.click()});
+  const m={cmt:'[data-cmt]',wish:'[data-wadd]','g-name':'[data-act="creategroup"]',jcode:'[data-act="joincode"]','w-name':'[data-act="start"]','w-code':'#w-name','w-name2':'[data-act="setname"]','w-email':'[data-act="otp"]'}[e.target.id];
+  if(m){const el=document.querySelector(m);if(!el)return;m[0]==='#'?el.focus():el.click()}});
 window.addEventListener('hashchange',()=>{const h=location.hash.slice(1);if(VIEWS.includes(h)&&h!==S.view){S.view=h;render()}});
