@@ -220,6 +220,29 @@ body.noapp #modebar{display:none!important}
 .osmpin{position:absolute;left:50%;top:50%;transform:translate(-50%,-100%);font-size:22px;background:#fff;border:3px solid var(--wine);border-radius:50%;width:40px;height:40px;display:flex;align-items:center;justify-content:center;box-shadow:0 3px 8px rgba(0,0,0,.35)}
 .osmpin.sm{width:22px;height:22px;font-size:11px;border-width:2px;transform:translate(-50%,-50%)}
 .osmattr{position:absolute;right:6px;bottom:4px;font-size:10px;background:rgba(255,255,255,.8);padding:1px 5px;border-radius:4px;color:#333}
+
+.modebar button{font-size:12.5px;padding:7px 2px}
+.gal{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.gal.big{grid-template-columns:repeat(3,1fr)}
+.gph,.gadd{position:relative;aspect-ratio:1;border-radius:12px;overflow:hidden;background:var(--soft);padding:0}
+.gph img{width:100%;height:100%;object-fit:cover;display:block}
+.gwho{position:absolute;left:5px;bottom:5px}.gwho .av{width:22px;height:22px;font-size:9px;border:2px solid #fff}
+.gadd{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;border:2px dashed var(--line);background:var(--card);color:var(--wine);font-size:12px;font-weight:600}
+.gadd span{font-size:28px;line-height:1}
+.evph .strip{position:absolute;right:10px;bottom:10px;display:flex;gap:5px}
+.evph .strip img{width:46px!important;height:46px!important;border-radius:10px;border:2px solid #fff;object-fit:cover;box-shadow:0 2px 6px rgba(0,0,0,.3)}
+.lb{position:fixed;inset:0;z-index:95;background:rgba(10,4,6,.96);display:none;flex-direction:column;color:#fff}
+.lb.on{display:flex}
+.lbtop{display:flex;justify-content:space-between;align-items:center;padding:calc(10px + env(safe-area-inset-top)) 14px 8px;font-size:14px}
+.lbtop button{color:#fff;font-size:22px;width:40px;height:40px}
+.lbimg{flex:1;display:flex;align-items:center;justify-content:center;min-height:0;padding:0 4px}
+.lbimg img{max-width:100%;max-height:100%;object-fit:contain;border-radius:6px}
+.lbnav{position:absolute;top:50%;transform:translateY(-50%);width:44px;height:64px;font-size:40px;color:#fff;background:rgba(255,255,255,.08);border-radius:12px}
+.lbnav.l{left:6px}.lbnav.r{right:6px}
+.lbbot{display:flex;align-items:center;gap:10px;padding:12px 14px calc(14px + env(safe-area-inset-bottom))}
+.lbbtn{color:#fff;background:rgba(255,255,255,.12);padding:8px 12px;border-radius:10px;font-size:13px;text-decoration:none}
+.upbar{position:fixed;left:50%;top:calc(12px + env(safe-area-inset-top));transform:translateX(-50%);background:var(--wine);color:#fff;padding:10px 16px;border-radius:12px;font-size:14px;z-index:99;display:none;box-shadow:var(--sh)}
+.upbar.on{display:block}
 </style>
 </head>
 <body>
@@ -241,10 +264,14 @@ body.noapp #modebar{display:none!important}
 <div id="toast"></div>
 <input type="file" id="file" accept="image/*" hidden>
 <input type="file" id="cam" accept="image/*" capture="environment" hidden>
+<input type="file" id="multi" accept="image/*" multiple hidden>
+<div id="lb" class="lb"></div>
+<div id="upbar" class="upbar"></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="config.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
 <script src="app.js"></script>
 <script src="rest.js"></script>
+<script src="eventos.js"></script>
 </body>
 </html>

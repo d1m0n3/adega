@@ -132,13 +132,13 @@ async function loadAll(){
     S.comments=chk(c).map(r=>({id:r.id,wineId:r.wine_id,uid:r.user_id,text:r.text,createdAt:Date.parse(r.created_at)}));
     S.cheers=chk(ch).map(r=>({wineId:r.wine_id,uid:r.user_id}));
     S.wish=chk(wl).map(r=>({id:r.id,groupId:r.group_id,uid:r.user_id,name:r.name,done:r.done,createdAt:Date.parse(r.created_at)}));
-    await loadRest();
-    const ids=[...new Set([S.uid,...S.members.map(x=>x.uid),...S.wines.map(x=>x.uid),...S.comments.map(x=>x.uid),...S.rests.map(x=>x.uid),...S.rcom.map(x=>x.uid)])];
+    await loadRest();await loadEvents();
+    const ids=[...new Set([S.uid,...S.members.map(x=>x.uid),...S.wines.map(x=>x.uid),...S.comments.map(x=>x.uid),...S.rests.map(x=>x.uid),...S.rcom.map(x=>x.uid),...S.photos.map(x=>x.uid),...S.events.map(x=>x.uid)])];
     if(ids.length){const p=chk(await sb.from('profiles').select('id,name').in('id',ids));for(const r of p)S.names[r.id]=r.name}
     if(S.gf!=='all'&&!groupMap()[S.gf])S.gf='all';
     S.loaded=true;S.err=null;
   }catch(e){S.err=errMsg(e)}
-  render();if(S.sheet&&!['form','rform','newgroup'].includes(S.sheet.type))renderSheet();
+  render();if(S.sheet&&!['form','rform','eform','newgroup'].includes(S.sheet.type))renderSheet();
 }
 
 // ---------- render ----------
@@ -150,8 +150,8 @@ function render(){
     $('#mebox').innerHTML=S.uid?`${av(S.uid)}<span>${esc(first(S.uid))}</span>`:'';
     renderChips();renderModeBar();
     let h=S.err?`<div class="banner">${esc(S.err)}</div>`:'';
-    const R=S.mode==='restaurantes';
-    h+=({feed:R?vRestFeed:vFeed,ranking:R?vRestRank:vRank,grupos:vGroups,eu:R?vRestStats:vStats}[S.view]||vFeed)();
+    const R=S.mode==='restaurantes',E=S.mode==='eventos';
+    h+=({feed:E?vEvFeed:R?vRestFeed:vFeed,ranking:E?()=>vEvStats(false):R?vRestRank:vRank,grupos:vGroups,eu:E?()=>vEvStats(true):R?vRestStats:vStats}[S.view]||vFeed)();
     $('#main').innerHTML=h;
   });
   afterRender();
@@ -279,9 +279,10 @@ function renderSheet(fresh){
   const s=S.sheet;if(!s)return;const p=$('#panel');
   if(s.type==='form'){if(fresh)p.innerHTML=formHTML();return}
   if(s.type==='rform'){if(fresh)p.innerHTML=rformHTML();return}
+  if(s.type==='eform'){if(fresh)p.innerHTML=eformHTML();return}
   if(s.type==='newgroup'){if(fresh)p.innerHTML=newGroupHTML();return}
   keepFocus(()=>{const vals={};p.querySelectorAll('input[id]').forEach(i=>vals[i.id]=i.value);const st=p.scrollTop;
-    p.innerHTML=s.type==='wine'?wineHTML(s.id):s.type==='rest'?restHTML(s.id):groupHTML(s.id);
+    p.innerHTML=s.type==='wine'?wineHTML(s.id):s.type==='rest'?restHTML(s.id):s.type==='event'?eventHTML(s.id):groupHTML(s.id);
     for(const k in vals){const el=document.getElementById(k);if(el)el.value=vals[k]}p.scrollTop=fresh?0:st});
   afterSheet();
 }
@@ -305,6 +306,7 @@ function wineHTML(id){
   h+='</div>';
   if(ch.length)h+=`<div class="small muted" style="margin-top:6px">Brindaram: ${ch.map(c=>esc(first(c.uid))).join(', ')}</div>`;
   if(same.length){const all=[w,...same];h+=`<div class="sec"><h2 style="font-size:17px">Outras provas deste vinho</h2><span class="small muted">média ${fr(avg(all.map(x=>x.rating)))} ★</span></div><div class="card" style="padding:4px 14px">${same.map(x=>`<div class="mem" data-open="${esc(x.id)}" style="cursor:pointer">${av(x.uid)}<div class="mid"><b>${esc(nameOf(x.uid))}</b> ${stars(x.rating)}<div class="small muted">${eur(x.price)}${x.comment?' · '+esc(x.comment.slice(0,70)):''}</div></div></div>`).join('')}</div>`}
+  h+=galleryHTML('wine',w.id,w.groupId);
   h+=`<div class="sec"><h2 style="font-size:17px">Comentários</h2><span class="small muted">${cms.length}</span></div><div class="card" style="padding:2px 14px">${cms.length?cms.map(c=>`<div class="cm">${av(c.uid)}<div class="t"><b>${esc(nameOf(c.uid))}</b> <span class="small muted">${ago(c.createdAt)}</span><div>${esc(c.text)}</div></div>${c.uid===S.uid||w.uid===S.uid?`<button class="small muted" data-delc="${esc(c.id)}">✕</button>`:''}</div>`).join(''):'<div class="cm muted small">Sê o primeiro a comentar.</div>'}</div>`;
   h+=`<div class="cmbox"><input class="inp" id="cmt" placeholder="Escreve um comentário…" maxlength="500"><button class="btn" data-cmt="${esc(w.id)}">Enviar</button></div>`;
   return h;
@@ -446,7 +448,7 @@ document.addEventListener('click',e=>{
   if(a==='rename'){const n=($('#acc-name').value||'').trim();if(!n)return;return act(async()=>{chk(await sb.from('profiles').upsert({id:S.uid,name:n.slice(0,40)}));S.myName=n;S.names[S.uid]=n;toast('Nome atualizado ✓');render()})}
   if(a==='linkemail'){const em=($('#acc-email').value||'').trim();if(!/.+@.+\..+/.test(em))return toast('Email inválido.');return act(async()=>{const r=await sb.auth.updateUser({email:em},{emailRedirectTo:appUrl()});if(r.error)throw r.error;toast('Confirma no email que te enviámos 📧')})}
   if(a==='logout')return act(async()=>{if(!await ask(S.email?'Terminar sessão neste telemóvel?':'Sem email ligado, perdes o acesso aos teus vinhos se saíres. Continuar?','Sair'))return;await sb.auth.signOut();location.href=appUrl()});
-  if(a==='new'){if(!myGroupIds().size){toast('Primeiro cria ou entra num grupo.');S.view='grupos';location.hash='grupos';return render()}return S.mode==='restaurantes'?(S.noRest?toast('Corre primeiro o restaurantes.sql no Supabase.'):openRForm()):openForm()}
+  if(a==='new'){if(!myGroupIds().size){toast('Primeiro cria ou entra num grupo.');S.view='grupos';location.hash='grupos';return render()}return S.mode==='eventos'?(S.noEv?toast('Corre primeiro o eventos.sql no Supabase.'):openEForm()):S.mode==='restaurantes'?(S.noRest?toast('Corre primeiro o restaurantes.sql no Supabase.'):openRForm()):openForm()}
   if(a==='pick'){$('#file').value='';return $('#file').click()}
   if(a==='cam'){$('#cam').value='';return $('#cam').click()}
   if(a==='buy'){F.buy=!F.buy;t.classList.toggle('on',F.buy);return}

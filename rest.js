@@ -5,7 +5,7 @@
 const CUISINES=['Portuguesa','Tasca','Petiscos','Marisqueira','Churrasqueira','Peixe','Carne / Steakhouse','Italiana / Pizzaria','Japonesa / Sushi','Asiática','Indiana','Brasileira','Mexicana','Hamburgueria','Vegetariana','Gourmet','Outra'];
 const SUBS=[['food','Comida'],['service','Serviço'],['ambiance','Ambiente']];
 Object.assign(S,{mode:'vinhos',rests:[],rcom:[],rch:[],rmap:false,noRest:false,rrk:'top'});
-try{const m=localStorage.getItem('adega.mode');if(m==='restaurantes')S.mode=m}catch(e){}
+try{const m=localStorage.getItem('adega.mode');if(m==='restaurantes'||m==='eventos')S.mode=m}catch(e){}
 let lmap=null,mini=null;
 
 // ---------- helpers ----------
@@ -46,8 +46,9 @@ async function loadRest(){
 // ---------- mode bar ----------
 function renderModeBar(){
   const b=$('#modebar');const show=S.view!=='grupos';b.style.display=show?'flex':'none';if(!show)return;
-  b.innerHTML=`<button class="${S.mode==='vinhos'?'on':''}" data-mode="vinhos">🍷 Vinhos</button><button class="${S.mode==='restaurantes'?'on':''}" data-mode="restaurantes">🍽️ Restaurantes</button>`;
-  const add=document.querySelector('#tabs .add');if(add)add.setAttribute('aria-label',S.mode==='vinhos'?'Novo vinho':'Novo restaurante');
+  b.innerHTML=`<button class="${S.mode==='vinhos'?'on':''}" data-mode="vinhos">🍷 Vinhos</button><button class="${S.mode==='restaurantes'?'on':''}" data-mode="restaurantes">🍽️ Restaurantes</button><button class="${S.mode==='eventos'?'on':''}" data-mode="eventos">📸 Eventos</button>`;
+  const add=document.querySelector('#tabs .add');if(add)add.setAttribute('aria-label',{vinhos:'Novo vinho',restaurantes:'Novo restaurante',eventos:'Novo evento'}[S.mode]);
+  const rk=document.querySelector('#tabs [data-tab="ranking"]');if(rk)rk.innerHTML=S.mode==='eventos'?'<span class="ic">🖼️</span>Memórias':'<span class="ic">🏆</span>Ranking';
 }
 function noRestBanner(){return S.noRest?`<div class="banner">Para ativar os restaurantes, corre o ficheiro <b>restaurantes.sql</b> no SQL Editor do Supabase.</div>`:''}
 
@@ -154,6 +155,9 @@ function restHTML(id){
   if(ch.length)h+=`<div class="small muted" style="margin-top:6px">Gostaram: ${ch.map(c=>esc(first(c.uid))).join(', ')}</div>`;
   if(wines.length)h+=`<div class="sec"><h2 style="font-size:17px">🍷 Vinhos bebidos aqui</h2></div>`+wines.map(w=>`<div class="rk" data-open="${esc(w.id)}">${w.photo?`<img src="${esc(photoSrc(w))}" alt="">`:'<div class="ni">🍷</div>'}<div class="mid"><b>${esc(w.name)}${w.vintage?' '+esc(w.vintage):''}</b><div class="small muted">por ${esc(first(w.uid))}</div>${stars(w.rating)}</div><div class="end"><b>${eur(w.price)}</b></div></div>`).join('');
   if(same.length){const all=[r,...same];h+=`<div class="sec"><h2 style="font-size:17px">Outras visitas</h2><span class="small muted">média ${fr(avg(all.map(x=>x.rating)))} ★</span></div><div class="card" style="padding:4px 14px">${same.map(x=>`<div class="mem" data-ropen="${esc(x.id)}" style="cursor:pointer">${av(x.uid)}<div class="mid"><b>${esc(nameOf(x.uid))}</b> ${stars(x.rating)}<div class="small muted">${x.pp!=null?eur(x.pp)+' /pessoa':''}${x.comment?' · '+esc(x.comment.slice(0,70)):''}</div></div></div>`).join('')}</div>`}
+  {const evs=S.events.filter(e=>e.rid===r.id).sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+   if(evs.length)h+=`<div class="sec"><h2 style="font-size:17px">🎉 Eventos aqui</h2></div>`+evs.map(e=>`<div class="rk" data-eopen="${esc(e.id)}">${evCover(e)?`<img src="${esc(evCover(e))}" alt="">`:'<div class="ni">🎉</div>'}<div class="mid"><b>${esc(e.title)}</b><div class="small muted">${esc(fmtDate(e.date))} · ${photosOf('event',e.id).length} fotos</div></div><div class="end">›</div></div>`).join('')}
+  h+=galleryHTML('restaurant',r.id,r.groupId);
   h+=`<div class="sec"><h2 style="font-size:17px">Comentários</h2><span class="small muted">${cms.length}</span></div><div class="card" style="padding:2px 14px">${cms.length?cms.map(c=>`<div class="cm">${av(c.uid)}<div class="t"><b>${esc(nameOf(c.uid))}</b> <span class="small muted">${ago(c.createdAt)}</span><div>${esc(c.text)}</div></div>${c.uid===S.uid||r.uid===S.uid?`<button class="small muted" data-rdelc="${esc(c.id)}">✕</button>`:''}</div>`).join(''):'<div class="cm muted small">Sê o primeiro a comentar.</div>'}</div>`;
   h+=`<div class="cmbox"><input class="inp" id="rcmt" placeholder="Escreve um comentário…" maxlength="500"><button class="btn" data-rcmt="${esc(r.id)}">Enviar</button></div>`;
   return h;
